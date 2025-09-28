@@ -1,15 +1,34 @@
-FROM node:alpine
+# syntax=docker.io/docker/dockerfile:1
 
-RUN mkdir -p /usr/src/node-app && chown -R node:node /usr/src/node-app
+FROM node:24-alpine AS base
 
-WORKDIR /usr/src/node-app
+FROM base AS deps
+WORKDIR /app
+COPY package*.json ./
+ENV NODE_ENV=production
+RUN npm ci --omit=dev
 
-COPY package.json yarn.lock ./
+FROM base AS builder
+WORKDIR /app
+COPY . .
+RUN npm ci
+RUN npm run build
 
-USER node
+FROM dercilio/andromeda AS runner
+LABEL maintainer="dafdev"
 
-RUN yarn install --pure-lockfile
+WORKDIR /usr/src/myapp
 
-COPY --chown=node:node . .
+# Copy only necessary files from build stage
+COPY --from=builder /app/package.json ./
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 
-EXPOSE 3000
+ENV PORT=8080
+
+EXPOSE 8080
+
+HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1
+
+# It will be started by Deployment command
+CMD ["andromeda", "dist/app.js" ]
