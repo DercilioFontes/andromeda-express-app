@@ -26,6 +26,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/src ./dist
 
 ENV PORT=8080
+# ENV RUST_LOG=debug
 
 EXPOSE 8080
 
